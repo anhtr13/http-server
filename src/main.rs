@@ -41,22 +41,39 @@ struct HttpRequest {
     method: HttpMethod,
     path: String,
     headers: HashMap<String, String>,
+    body: String,
 }
 
 impl HttpRequest {
-    fn parse(data: Vec<String>) -> Result<Self, ParseError> {
+    fn parse(data: &[String]) -> Result<Self, ParseError> {
         if data.is_empty() {
             return Err(ParseError::InvalidInput);
         }
-        let info: Vec<&str> = data[0].split_whitespace().collect();
-        if info.len() < 3 {
+
+        let req_status: Vec<&str> = data[0].split_whitespace().collect();
+        if req_status.len() < 3 {
             return Err(ParseError::InvalidInput);
         }
-        let method = HttpMethod::from_str(&info[0])?;
+
+        let method = HttpMethod::from_str(req_status[0])?;
+        let path = req_status[1].to_string();
+        let mut headers = HashMap::new();
+        let mut body = String::new();
+
+        for line in data.iter().skip(1) {
+            if let Some((key, val)) = line.split_once(": ") {
+                headers.insert(key.to_string(), val.to_string());
+            } else {
+                body.push_str(line);
+                body.push_str("\r\n");
+            }
+        }
+
         Ok(Self {
             method,
-            path: info[1].to_string(),
-            headers: HashMap::new(),
+            path,
+            headers,
+            body,
         })
     }
 }
@@ -113,10 +130,10 @@ fn main() -> io::Result<()> {
 
                 println!("{:?}", data);
 
-                if let Ok(http_request) = HttpRequest::parse(data) {
-                    println!("Accepted new connection: {:?}", http_request);
+                if let Ok(request) = HttpRequest::parse(&data) {
+                    println!("Accepted new connection: {:?}", request);
                     let mut response = HttpResponse::default();
-                    match http_request.path.as_str() {
+                    match request.path.as_str() {
                         "/" => stream.write_all(response.to_string().as_bytes())?,
                         p => {
                             if p.starts_with("/echo/")
@@ -126,7 +143,24 @@ fn main() -> io::Result<()> {
                                 response.body = sub_path.to_string();
                                 response.headers = HashMap::from([
                                     ("Content-Type".to_string(), "text/plain".to_string()),
-                                    ("Content-Length".to_string(), sub_path.len().to_string()),
+                                    (
+                                        "Content-Length".to_string(),
+                                        response.body.len().to_string(),
+                                    ),
+                                ]);
+                                stream.write_all(response.to_string().as_bytes())?
+                            } else if p.starts_with("/user-agent") {
+                                response.body = request
+                                    .headers
+                                    .get("User-Agent")
+                                    .unwrap_or(&"".to_string())
+                                    .to_string();
+                                response.headers = HashMap::from([
+                                    ("Content-Type".to_string(), "text/plain".to_string()),
+                                    (
+                                        "Content-Length".to_string(),
+                                        response.body.len().to_string(),
+                                    ),
                                 ]);
                                 stream.write_all(response.to_string().as_bytes())?
                             } else {
