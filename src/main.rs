@@ -35,11 +35,12 @@ impl FromStr for HttpMethod {
     }
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 struct HttpRequest {
-    _method: HttpMethod,
+    method: HttpMethod,
     path: String,
-    _headers: HashMap<String, String>,
+    headers: HashMap<String, String>,
 }
 
 impl HttpRequest {
@@ -53,9 +54,9 @@ impl HttpRequest {
         }
         let method = HttpMethod::from_str(&info[0])?;
         Ok(Self {
-            _method: method,
+            method,
             path: info[1].to_string(),
-            _headers: HashMap::new(),
+            headers: HashMap::new(),
         })
     }
 }
@@ -63,22 +64,28 @@ impl HttpRequest {
 #[derive(Debug)]
 struct HttpResponse {
     status: u16,
+    headers: HashMap<String, String>,
+    body: String,
 }
 
 impl Display for HttpResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "HTTP/1.1 {} {}\r\n\r\n\r\n",
-            self.status,
-            self.status_reason()
-        )
+        let status_line = format!("HTTP/1.1 {} {}", self.status, self.status_reason());
+        let mut headers = String::new();
+        for (key, val) in self.headers.iter() {
+            headers.push_str(&format!("{}: {}\r\n", key, val));
+        }
+        write!(f, "{}\r\n{}\r\n{}\r\n", status_line, headers, self.body)
     }
 }
 
 impl HttpResponse {
-    fn new(status: u16) -> Self {
-        Self { status }
+    fn default() -> Self {
+        Self {
+            status: 200,
+            headers: HashMap::new(),
+            body: String::new(),
+        }
     }
     fn status_reason(&self) -> &str {
         match self.status {
@@ -108,9 +115,25 @@ fn main() -> io::Result<()> {
 
                 if let Ok(http_request) = HttpRequest::parse(data) {
                     println!("Accepted new connection: {:?}", http_request);
+                    let mut response = HttpResponse::default();
                     match http_request.path.as_str() {
-                        "/" => stream.write_all(HttpResponse::new(200).to_string().as_bytes())?,
-                        _ => stream.write_all(HttpResponse::new(404).to_string().as_bytes())?,
+                        "/" => stream.write_all(response.to_string().as_bytes())?,
+                        p => {
+                            if p.starts_with("/echo/")
+                                && let sub_path = p.trim_start_matches("/echo/")
+                                && !sub_path.is_empty()
+                            {
+                                response.body = sub_path.to_string();
+                                response.headers = HashMap::from([
+                                    ("Content-Type".to_string(), "text/plain".to_string()),
+                                    ("Content-Length".to_string(), sub_path.len().to_string()),
+                                ]);
+                                stream.write_all(response.to_string().as_bytes())?
+                            } else {
+                                response.status = 404;
+                                stream.write_all(response.to_string().as_bytes())?
+                            }
+                        }
                     }
                     stream.flush()?;
                 }
