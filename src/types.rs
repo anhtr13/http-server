@@ -1,8 +1,10 @@
 use std::str::FromStr;
 
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum ParseError {
+    #[error("not a http method")]
     UnknowMethod,
+    #[error("cannot parse input")]
     InvalidInput,
 }
 

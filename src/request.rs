@@ -12,14 +12,14 @@ pub struct HttpRequest {
 }
 
 impl HttpRequest {
-    pub fn parse(data: &[String]) -> Result<Self, ParseError> {
+    pub fn parse(data: &[String]) -> anyhow::Result<Self> {
         if data.is_empty() {
-            return Err(ParseError::InvalidInput);
+            return Err(anyhow::Error::new(ParseError::InvalidInput));
         }
 
         let req_status: Vec<&str> = data[0].split_whitespace().collect();
         if req_status.len() < 3 {
-            return Err(ParseError::InvalidInput);
+            return Err(ParseError::InvalidInput.into());
         }
 
         let method = HttpMethod::from_str(req_status[0])?;
