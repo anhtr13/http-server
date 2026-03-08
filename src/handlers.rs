@@ -3,7 +3,6 @@ use std::{
     env,
     fs::{self, OpenOptions},
     io::Write,
-    net::TcpStream,
     path::Path,
 };
 
@@ -11,13 +10,12 @@ use flate2::{Compression, write::GzEncoder};
 
 use crate::http::{COMPRESSION_SCHEMES, Header, request::Request, response::Response};
 
-pub fn hander_default(stream: &mut TcpStream, _req: Request) -> anyhow::Result<()> {
+pub fn hander_default(_req: Request) -> anyhow::Result<Response> {
     let response = Response::default();
-    stream.write_all(&response.into_bytes())?;
-    Ok(())
+    Ok(response)
 }
 
-pub fn hander_echo(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
+pub fn hander_echo(req: Request) -> anyhow::Result<Response> {
     let echo_str = req.path.trim_start_matches("/echo/");
     let mut response = Response {
         status: 200,
@@ -43,11 +41,10 @@ pub fn hander_echo(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
             }
         }
     }
-    stream.write_all(&response.into_bytes())?;
-    Ok(())
+    Ok(response)
 }
 
-pub fn hander_user_agent(stream: &mut TcpStream, mut req: Request) -> anyhow::Result<()> {
+pub fn hander_user_agent(mut req: Request) -> anyhow::Result<Response> {
     let payload = req
         .headers
         .remove(&Header::UserAgent)
@@ -62,21 +59,19 @@ pub fn hander_user_agent(stream: &mut TcpStream, mut req: Request) -> anyhow::Re
         body: payload,
         headers: res_headers,
     };
-    stream.write_all(&response.into_bytes())?;
-    Ok(())
+    Ok(response)
 }
 
-pub fn hander_not_found(stream: &mut TcpStream, _req: Request) -> anyhow::Result<()> {
+pub fn hander_not_found(_req: Request) -> anyhow::Result<Response> {
     let response = Response {
         status: 404,
         body: Vec::new(),
         headers: HashMap::new(),
     };
-    stream.write_all(&response.into_bytes())?;
-    Ok(())
+    Ok(response)
 }
 
-pub fn hander_read_file(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
+pub fn hander_read_file(req: Request) -> anyhow::Result<Response> {
     let args: Vec<String> = env::args().collect();
     let mut dir_name = String::new();
     let mut dir_flag = false;
@@ -105,7 +100,7 @@ pub fn hander_read_file(stream: &mut TcpStream, req: Request) -> anyhow::Result<
                 ]),
                 body: content,
             };
-            stream.write_all(&response.into_bytes())?;
+            Ok(response)
         }
         Err(_) => {
             let response = Response {
@@ -113,13 +108,11 @@ pub fn hander_read_file(stream: &mut TcpStream, req: Request) -> anyhow::Result<
                 body: Vec::new(),
                 headers: HashMap::new(),
             };
-            stream.write_all(&response.into_bytes())?;
+            Ok(response)
         }
     }
-
-    Ok(())
 }
-pub fn hander_write_file(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
+pub fn hander_write_file(req: Request) -> anyhow::Result<Response> {
     let args: Vec<String> = env::args().collect();
     let mut dir_name = String::new();
     let mut dir_flag = false;
@@ -147,6 +140,5 @@ pub fn hander_write_file(stream: &mut TcpStream, req: Request) -> anyhow::Result
         headers: HashMap::new(),
         body: Vec::new(),
     };
-    stream.write_all(&response.into_bytes())?;
-    Ok(())
+    Ok(response)
 }

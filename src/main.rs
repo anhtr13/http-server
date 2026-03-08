@@ -9,28 +9,38 @@ use std::{
 
 use http::request::Request;
 
-use crate::{http::Method, thread_pool::ThreadPool};
+use crate::{
+    http::{Header, Method},
+    thread_pool::ThreadPool,
+};
 
 fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
     loop {
         let request = Request::from_tcpstream(&mut stream)?;
         println!("New request: {:?}", request);
-        let should_close = if let Some(conn_header) = request.headers.get(&http::Header::Connection)
-            && conn_header == "close"
+
+        let should_close = if let Some(closure) = request.headers.get(&http::Header::Connection)
+            && closure == "close"
         {
             true
         } else {
             false
         };
 
-        match (&request.method, request.path.as_str()) {
-            (_, "/") => handlers::hander_default(&mut stream, request)?,
-            (_, p) if p.starts_with("/echo") => handlers::hander_echo(&mut stream, request)?,
-            (Method::Get, "/user-agent") => handlers::hander_user_agent(&mut stream, request)?,
-            (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(&mut stream, request)?,
-            (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(&mut stream, request)?,
-            _ => handlers::hander_not_found(&mut stream, request)?,
+        let mut response = match (&request.method, request.path.as_str()) {
+            (_, "/") => handlers::hander_default(request)?,
+            (_, p) if p.starts_with("/echo") => handlers::hander_echo(request)?,
+            (Method::Get, "/user-agent") => handlers::hander_user_agent(request)?,
+            (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(request)?,
+            (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(request)?,
+            _ => handlers::hander_not_found(request)?,
+        };
+
+        if should_close {
+            response.headers.insert(Header::Connection, "close".to_string());
         }
+
+        stream.write_all(&response.into_bytes())?;
         stream.flush()?;
 
         if should_close {
