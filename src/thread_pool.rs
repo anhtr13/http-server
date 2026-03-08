@@ -54,22 +54,14 @@ impl ThreadPool {
             workers.push(Worker::new(id, receiver.clone()));
         }
 
-        Self {
-            size,
-            sender,
-            workers,
-        }
+        Self { size, sender, workers }
     }
     pub fn excute<F>(&self, f: F)
     where
         F: FnOnce() + Send + 'static,
     {
         let job = Box::new(f);
-        self.sender
-            .as_ref()
-            .unwrap()
-            .send(job)
-            .expect("failed to send job");
+        self.sender.as_ref().unwrap().send(job).expect("failed to send job");
     }
 }
 

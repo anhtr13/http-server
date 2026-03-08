@@ -1,33 +1,27 @@
 mod handlers;
-mod request;
-mod response;
+mod http;
 mod thread_pool;
-mod types;
 
 use std::{
-    io::{BufRead, BufReader, Write},
+    io::Write,
     net::{TcpListener, TcpStream},
 };
 
-use request::HttpRequest;
+use http::request::Request;
 
-use crate::thread_pool::ThreadPool;
+use crate::{http::Method, thread_pool::ThreadPool};
 
 fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
-    let buf_reader = BufReader::new(&stream);
-    let data: Vec<_> = buf_reader
-        .lines()
-        .map(|result| result.unwrap())
-        .take_while(|line| !line.is_empty())
-        .collect();
+    let request = Request::from_tcpstream(&mut stream)?;
 
-    let request = HttpRequest::parse(&data)?;
     println!("Accepted new connection: {:?}", request);
-    match request.path.as_str() {
-        "/" => handlers::hander_default(&mut stream, &request)?,
-        "/user-agent" => handlers::hander_user_agent(&mut stream, &request)?,
-        p if p.starts_with("/echo") => handlers::hander_echo(&mut stream, &request)?,
-        p if p.starts_with("/files") => handlers::hander_return_file(&mut stream, &request)?,
+
+    match (&request.method, request.path.as_str()) {
+        (_, "/") => handlers::hander_default(&mut stream, &request)?,
+        (_, p) if p.starts_with("/echo") => handlers::hander_echo(&mut stream, &request)?,
+        (Method::Get, "/user-agent") => handlers::hander_user_agent(&mut stream, &request)?,
+        (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(&mut stream, &request)?,
+        (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(&mut stream, &request)?,
         _ => handlers::hander_not_found(&mut stream, &request)?,
     }
     stream.flush()?;
