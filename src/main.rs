@@ -12,19 +12,31 @@ use http::request::Request;
 use crate::{http::Method, thread_pool::ThreadPool};
 
 fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
-    let request = Request::from_tcpstream(&mut stream)?;
-    println!("Accepted new connection: {:?}", request);
+    loop {
+        let request = Request::from_tcpstream(&mut stream)?;
+        println!("New request: {:?}", request);
+        let should_close = if let Some(conn_header) = request.headers.get(&http::Header::Connection)
+            && conn_header == "close"
+        {
+            true
+        } else {
+            false
+        };
 
-    match (&request.method, request.path.as_str()) {
-        (_, "/") => handlers::hander_default(&mut stream, request)?,
-        (_, p) if p.starts_with("/echo") => handlers::hander_echo(&mut stream, request)?,
-        (Method::Get, "/user-agent") => handlers::hander_user_agent(&mut stream, request)?,
-        (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(&mut stream, request)?,
-        (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(&mut stream, request)?,
-        _ => handlers::hander_not_found(&mut stream, request)?,
+        match (&request.method, request.path.as_str()) {
+            (_, "/") => handlers::hander_default(&mut stream, request)?,
+            (_, p) if p.starts_with("/echo") => handlers::hander_echo(&mut stream, request)?,
+            (Method::Get, "/user-agent") => handlers::hander_user_agent(&mut stream, request)?,
+            (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(&mut stream, request)?,
+            (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(&mut stream, request)?,
+            _ => handlers::hander_not_found(&mut stream, request)?,
+        }
+        stream.flush()?;
+
+        if should_close {
+            return Ok(());
+        }
     }
-    stream.flush()?;
-    Ok(())
 }
 
 fn main() -> anyhow::Result<()> {

@@ -26,13 +26,12 @@ impl Response {
         }
     }
     pub fn into_bytes(self) -> Vec<u8> {
-        let mut v = format!("HTTP/1.1 {} {}\r\n", self.status, self.status_reason()).into_bytes();
+        let mut bytes = format!("HTTP/1.1 {} {}\r\n", self.status, self.status_reason()).into_bytes();
         for (key, val) in self.headers.iter() {
-            v.extend(&format!("{}: {}\r\n", key, val).into_bytes());
+            bytes.extend(&format!("{}: {}\r\n", key, val).into_bytes());
         }
-        v.extend([b'\r', b'\n']);
-        v.extend(self.body);
-        v.extend([b'\r', b'\n']);
-        v
+        bytes.extend([b'\r', b'\n']);
+        bytes.extend(self.body);
+        bytes
     }
 }
