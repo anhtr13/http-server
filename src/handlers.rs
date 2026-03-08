@@ -7,7 +7,7 @@ use std::{
     path::Path,
 };
 
-use crate::http::{Header, request::Request, response::Response};
+use crate::http::{COMPRESSION_SCHEMES, Header, request::Request, response::Response};
 
 pub fn hander_default(stream: &mut TcpStream, _req: &Request) -> anyhow::Result<()> {
     let response = Response::default();
@@ -25,10 +25,14 @@ pub fn hander_echo(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> 
             (Header::ContentLength, sub_path.len().to_string()),
         ]),
     };
-    if let Some(compress_scheme) = req.headers.get(&Header::AcceptEncoding)
-        && compress_scheme == "gzip"
-    {
-        response.headers.insert(Header::ContentEncoding, "gzip".to_string());
+    if let Some(schemes) = req.headers.get(&Header::AcceptEncoding) {
+        let schemes: Vec<&str> = schemes.split(", ").collect();
+        for scheme in schemes {
+            if COMPRESSION_SCHEMES.contains(&scheme) {
+                response.headers.insert(Header::ContentEncoding, scheme.to_string());
+                break;
+            }
+        }
     }
     stream.write_all(response.to_string().as_bytes())?;
     Ok(())

@@ -85,3 +85,5 @@ impl Display for Header {
         }
     }
 }
+
+pub const COMPRESSION_SCHEMES: [&str; 1] = ["gzip"];
