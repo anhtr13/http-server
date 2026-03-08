@@ -13,7 +13,7 @@ pub struct Request {
     pub method: Method,
     pub path: String,
     pub headers: HashMap<Header, String>,
-    pub body: String,
+    pub body: Vec<u8>,
 }
 
 impl Request {
@@ -60,14 +60,8 @@ impl Request {
             method,
             path,
             headers,
-            body: String::new(),
+            body: Vec::new(),
         })
-    }
-
-    fn add_body(&mut self, buf: Vec<u8>) -> anyhow::Result<()> {
-        let body = String::from_utf8(buf)?;
-        self.body = body;
-        Ok(())
     }
 
     pub fn from_tcpstream(stream: &mut TcpStream) -> anyhow::Result<Self> {
@@ -86,7 +80,7 @@ impl Request {
         {
             let mut buffer = vec![0u8; n];
             reader.read_exact(&mut buffer)?;
-            request.add_body(buffer)?;
+            request.body = buffer;
         }
 
         Ok(request)

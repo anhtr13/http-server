@@ -7,22 +7,24 @@ use std::{
     path::Path,
 };
 
+use flate2::{Compression, write::GzEncoder};
+
 use crate::http::{COMPRESSION_SCHEMES, Header, request::Request, response::Response};
 
-pub fn hander_default(stream: &mut TcpStream, _req: &Request) -> anyhow::Result<()> {
+pub fn hander_default(stream: &mut TcpStream, _req: Request) -> anyhow::Result<()> {
     let response = Response::default();
-    stream.write_all(response.to_string().as_bytes())?;
+    stream.write_all(&response.into_bytes())?;
     Ok(())
 }
 
-pub fn hander_echo(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> {
-    let sub_path = req.path.trim_start_matches("/echo/");
+pub fn hander_echo(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
+    let echo_str = req.path.trim_start_matches("/echo/");
     let mut response = Response {
         status: 200,
-        body: sub_path.to_string(),
+        body: echo_str.as_bytes().to_vec(),
         headers: HashMap::from([
             (Header::ContentType, "text/plain".to_string()),
-            (Header::ContentLength, sub_path.len().to_string()),
+            (Header::ContentLength, echo_str.len().to_string()),
         ]),
     };
     if let Some(schemes) = req.headers.get(&Header::AcceptEncoding) {
@@ -30,44 +32,51 @@ pub fn hander_echo(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> 
         for scheme in schemes {
             if COMPRESSION_SCHEMES.contains(&scheme) {
                 response.headers.insert(Header::ContentEncoding, scheme.to_string());
+                let mut encoder = GzEncoder::new(Vec::new(), Compression::default());
+                encoder.write_all(echo_str.as_bytes())?;
+                let compressed_data = encoder.finish()?;
+                response
+                    .headers
+                    .insert(Header::ContentLength, compressed_data.len().to_string());
+                response.body = compressed_data;
                 break;
             }
         }
     }
-    stream.write_all(response.to_string().as_bytes())?;
+    stream.write_all(&response.into_bytes())?;
     Ok(())
 }
 
-pub fn hander_user_agent(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> {
-    let res_body = req
+pub fn hander_user_agent(stream: &mut TcpStream, mut req: Request) -> anyhow::Result<()> {
+    let payload = req
         .headers
-        .get(&Header::UserAgent)
-        .unwrap_or(&"".to_string())
-        .to_string();
+        .remove(&Header::UserAgent)
+        .unwrap_or("".to_string())
+        .into_bytes();
     let res_headers = HashMap::from([
         (Header::ContentType, "text/plain".to_string()),
-        (Header::ContentLength, res_body.len().to_string()),
+        (Header::ContentLength, payload.len().to_string()),
     ]);
     let response = Response {
         status: 200,
-        body: res_body,
+        body: payload,
         headers: res_headers,
     };
-    stream.write_all(response.to_string().as_bytes())?;
+    stream.write_all(&response.into_bytes())?;
     Ok(())
 }
 
-pub fn hander_not_found(stream: &mut TcpStream, _req: &Request) -> anyhow::Result<()> {
+pub fn hander_not_found(stream: &mut TcpStream, _req: Request) -> anyhow::Result<()> {
     let response = Response {
         status: 404,
-        body: String::new(),
+        body: Vec::new(),
         headers: HashMap::new(),
     };
-    stream.write_all(response.to_string().as_bytes())?;
+    stream.write_all(&response.into_bytes())?;
     Ok(())
 }
 
-pub fn hander_read_file(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> {
+pub fn hander_read_file(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let mut dir_name = String::new();
     let mut dir_flag = false;
@@ -86,7 +95,7 @@ pub fn hander_read_file(stream: &mut TcpStream, req: &Request) -> anyhow::Result
     let path_str = format!("{dir_name}/{file_name}");
     let path = Path::new(&path_str);
 
-    match fs::read_to_string(path) {
+    match fs::read(path) {
         Ok(content) => {
             let response = Response {
                 status: 200,
@@ -96,21 +105,21 @@ pub fn hander_read_file(stream: &mut TcpStream, req: &Request) -> anyhow::Result
                 ]),
                 body: content,
             };
-            stream.write_all(response.to_string().as_bytes())?;
+            stream.write_all(&response.into_bytes())?;
         }
         Err(_) => {
             let response = Response {
                 status: 404,
-                body: String::new(),
+                body: Vec::new(),
                 headers: HashMap::new(),
             };
-            stream.write_all(response.to_string().as_bytes())?;
+            stream.write_all(&response.into_bytes())?;
         }
     }
 
     Ok(())
 }
-pub fn hander_write_file(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> {
+pub fn hander_write_file(stream: &mut TcpStream, req: Request) -> anyhow::Result<()> {
     let args: Vec<String> = env::args().collect();
     let mut dir_name = String::new();
     let mut dir_flag = false;
@@ -132,12 +141,12 @@ pub fn hander_write_file(stream: &mut TcpStream, req: &Request) -> anyhow::Resul
         .write(true)
         .truncate(true)
         .open(path_str)?;
-    write!(&mut file, "{}", req.body)?;
+    write!(&mut file, "{}", str::from_utf8(&req.body)?)?;
     let response = Response {
         status: 201,
         headers: HashMap::new(),
-        body: String::new(),
+        body: Vec::new(),
     };
-    stream.write_all(response.to_string().as_bytes())?;
+    stream.write_all(&response.into_bytes())?;
     Ok(())
 }

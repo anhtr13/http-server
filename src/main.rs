@@ -16,12 +16,12 @@ fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
     println!("Accepted new connection: {:?}", request);
 
     match (&request.method, request.path.as_str()) {
-        (_, "/") => handlers::hander_default(&mut stream, &request)?,
-        (_, p) if p.starts_with("/echo") => handlers::hander_echo(&mut stream, &request)?,
-        (Method::Get, "/user-agent") => handlers::hander_user_agent(&mut stream, &request)?,
-        (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(&mut stream, &request)?,
-        (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(&mut stream, &request)?,
-        _ => handlers::hander_not_found(&mut stream, &request)?,
+        (_, "/") => handlers::hander_default(&mut stream, request)?,
+        (_, p) if p.starts_with("/echo") => handlers::hander_echo(&mut stream, request)?,
+        (Method::Get, "/user-agent") => handlers::hander_user_agent(&mut stream, request)?,
+        (Method::Get, p) if p.starts_with("/files") => handlers::hander_read_file(&mut stream, request)?,
+        (Method::Post, p) if p.starts_with("/files") => handlers::hander_write_file(&mut stream, request)?,
+        _ => handlers::hander_not_found(&mut stream, request)?,
     }
     stream.flush()?;
     Ok(())
