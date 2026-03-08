@@ -13,7 +13,6 @@ use crate::{http::Method, thread_pool::ThreadPool};
 
 fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
     let request = Request::from_tcpstream(&mut stream)?;
-
     println!("Accepted new connection: {:?}", request);
 
     match (&request.method, request.path.as_str()) {
@@ -29,10 +28,10 @@ fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
 }
 
 fn main() -> anyhow::Result<()> {
-    println!("Logs from your program will appear here!");
-
     let listener = TcpListener::bind("127.0.0.1:4221").unwrap();
     let pool = ThreadPool::new(8);
+
+    println!("Logs from program:");
 
     for stream in listener.incoming() {
         match stream {

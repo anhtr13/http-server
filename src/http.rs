@@ -39,6 +39,8 @@ impl FromStr for Method {
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub enum Header {
     Accept,
+    AcceptEncoding,
+    ContentEncoding,
     Authorization,
     CacheControl,
     ContentType,
@@ -53,6 +55,8 @@ impl FromStr for Header {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "Accept" => Ok(Self::Accept),
+            "Accept-Encoding" => Ok(Self::AcceptEncoding),
+            "Content-Encoding" => Ok(Self::ContentEncoding),
             "Authorization" => Ok(Self::Authorization),
             "Cache-Control" => Ok(Self::CacheControl),
             "Content-Type" => Ok(Self::ContentType),
@@ -69,6 +73,8 @@ impl Display for Header {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Accept => write!(f, "Accept"),
+            Self::AcceptEncoding => write!(f, "Accept-Encoding"),
+            Self::ContentEncoding => write!(f, "Content-Encoding"),
             Self::Authorization => write!(f, "Authorization"),
             Self::CacheControl => write!(f, "Cache-Control"),
             Self::ContentType => write!(f, "Content-Type"),

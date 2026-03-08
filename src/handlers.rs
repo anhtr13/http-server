@@ -17,7 +17,7 @@ pub fn hander_default(stream: &mut TcpStream, _req: &Request) -> anyhow::Result<
 
 pub fn hander_echo(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> {
     let sub_path = req.path.trim_start_matches("/echo/");
-    let response = Response {
+    let mut response = Response {
         status: 200,
         body: sub_path.to_string(),
         headers: HashMap::from([
@@ -25,6 +25,11 @@ pub fn hander_echo(stream: &mut TcpStream, req: &Request) -> anyhow::Result<()> 
             (Header::ContentLength, sub_path.len().to_string()),
         ]),
     };
+    if let Some(compress_scheme) = req.headers.get(&Header::AcceptEncoding)
+        && compress_scheme == "gzip"
+    {
+        response.headers.insert(Header::ContentEncoding, "gzip".to_string());
+    }
     stream.write_all(response.to_string().as_bytes())?;
     Ok(())
 }
