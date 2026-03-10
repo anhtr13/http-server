@@ -75,8 +75,8 @@ impl Request {
         }
 
         let mut request = Self::from_utf8(buffer)?;
-        if let Some(content_lenth) = request.headers.get(&Header::ContentLength)
-            && let Ok(n) = content_lenth.parse::<usize>()
+        if let Some(content_length) = request.headers.get(&Header::ContentLength)
+            && let Ok(n) = content_length.parse::<usize>()
         {
             let mut buffer = vec![0u8; n];
             reader.read_exact(&mut buffer)?;

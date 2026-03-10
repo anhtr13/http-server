@@ -19,12 +19,12 @@ fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
         let request = Request::from_tcpstream(&mut stream)?;
         println!("New request: {:?}", request);
 
-        let should_close = if let Some(closure) = request.headers.get(&http::Header::Connection)
+        let keep_alive = if let Some(closure) = request.headers.get(&http::Header::Connection)
             && closure == "close"
         {
-            true
-        } else {
             false
+        } else {
+            true
         };
 
         let mut response = match (&request.method, request.path.as_str()) {
@@ -36,14 +36,14 @@ fn handle_connection(mut stream: TcpStream) -> anyhow::Result<()> {
             _ => handlers::hander_not_found(request)?,
         };
 
-        if should_close {
+        if !keep_alive {
             response.headers.insert(Header::Connection, "close".to_string());
         }
 
         stream.write_all(&response.into_bytes())?;
         stream.flush()?;
 
-        if should_close {
+        if !keep_alive {
             return Ok(());
         }
     }

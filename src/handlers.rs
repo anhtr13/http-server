@@ -45,30 +45,27 @@ pub fn hander_echo(req: Request) -> anyhow::Result<Response> {
 }
 
 pub fn hander_user_agent(mut req: Request) -> anyhow::Result<Response> {
-    let payload = req
+    let res_body = req
         .headers
         .remove(&Header::UserAgent)
         .unwrap_or("".to_string())
         .into_bytes();
-    let res_headers = HashMap::from([
-        (Header::ContentType, "text/plain".to_string()),
-        (Header::ContentLength, payload.len().to_string()),
-    ]);
-    let response = Response {
+    Ok(Response {
         status: 200,
-        body: payload,
-        headers: res_headers,
-    };
-    Ok(response)
+        headers: HashMap::from([
+            (Header::ContentType, "text/plain".to_string()),
+            (Header::ContentLength, res_body.len().to_string()),
+        ]),
+        body: res_body,
+    })
 }
 
 pub fn hander_not_found(_req: Request) -> anyhow::Result<Response> {
-    let response = Response {
+    Ok(Response {
         status: 404,
         body: Vec::new(),
         headers: HashMap::new(),
-    };
-    Ok(response)
+    })
 }
 
 pub fn hander_read_file(req: Request) -> anyhow::Result<Response> {
@@ -91,25 +88,19 @@ pub fn hander_read_file(req: Request) -> anyhow::Result<Response> {
     let path = Path::new(&path_str);
 
     match fs::read(path) {
-        Ok(content) => {
-            let response = Response {
-                status: 200,
-                headers: HashMap::from([
-                    (Header::ContentType, "application/octet-stream".to_string()),
-                    (Header::ContentLength, content.len().to_string()),
-                ]),
-                body: content,
-            };
-            Ok(response)
-        }
-        Err(_) => {
-            let response = Response {
-                status: 404,
-                body: Vec::new(),
-                headers: HashMap::new(),
-            };
-            Ok(response)
-        }
+        Ok(content) => Ok(Response {
+            status: 200,
+            headers: HashMap::from([
+                (Header::ContentType, "application/octet-stream".to_string()),
+                (Header::ContentLength, content.len().to_string()),
+            ]),
+            body: content,
+        }),
+        Err(_) => Ok(Response {
+            status: 404,
+            body: Vec::new(),
+            headers: HashMap::new(),
+        }),
     }
 }
 pub fn hander_write_file(req: Request) -> anyhow::Result<Response> {
@@ -135,10 +126,9 @@ pub fn hander_write_file(req: Request) -> anyhow::Result<Response> {
         .truncate(true)
         .open(path_str)?;
     write!(&mut file, "{}", str::from_utf8(&req.body)?)?;
-    let response = Response {
+    Ok(Response {
         status: 201,
         headers: HashMap::new(),
         body: Vec::new(),
-    };
-    Ok(response)
+    })
 }

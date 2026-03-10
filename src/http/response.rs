@@ -17,6 +17,7 @@ impl Response {
             body: Vec::new(),
         }
     }
+
     fn status_reason(&self) -> &str {
         match self.status {
             200 => "OK",
@@ -25,13 +26,14 @@ impl Response {
             _ => "",
         }
     }
-    pub fn into_bytes(self) -> Vec<u8> {
+
+    pub fn into_bytes(mut self) -> Vec<u8> {
         let mut bytes = format!("HTTP/1.1 {} {}\r\n", self.status, self.status_reason()).into_bytes();
-        for (key, val) in self.headers.iter() {
-            bytes.extend(&format!("{}: {}\r\n", key, val).into_bytes());
+        for (key, val) in self.headers {
+            bytes.append(&mut format!("{}: {}\r\n", key, val).into_bytes());
         }
-        bytes.extend([b'\r', b'\n']);
-        bytes.extend(self.body);
+        bytes.append(&mut vec![b'\r', b'\n']);
+        bytes.append(&mut self.body);
         bytes
     }
 }
